@@ -9,7 +9,7 @@ import javafx.stage.Stage;
 public class App extends Application {
     @Override
     public void start(Stage primaryStage) throws Exception {
-        Parent parent = FXMLLoader.load(getClass().getResource("chat.fxml"));
+        Parent parent = FXMLLoader.load(getClass().getResource("chat-server-client.fxml"));
         primaryStage.setScene(new Scene(parent));
         primaryStage.show();
     }

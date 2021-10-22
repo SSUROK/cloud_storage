@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.text.*?>
+<?import java.lang.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane prefHeight="538.0" prefWidth="344.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.geekbrains.io.ChatController">
+   <children>
+      <Button fx:id="download" layoutX="219.0" layoutY="497.0" mnemonicParsing="false" text="Download" />
+      <Button fx:id="upload" layoutX="61.0" layoutY="497.0" mnemonicParsing="false" onAction="#sendMessage" text="Upload" />
+      <Label layoutX="75.0" layoutY="6.0" text="You" />
+      <Label layoutX="241.0" layoutY="6.0" text="Server" />
+      <ListView fx:id="listLeft" layoutY="23.0" prefHeight="428.0" prefWidth="172.0" />
+      <ListView fx:id="listRight" layoutX="173.0" layoutY="23.0" prefHeight="428.0" prefWidth="172.0" />
+      <TextField fx:id="input" layoutX="110.0" layoutY="462.0" prefHeight="27.0" prefWidth="227.0" />
+      <Label layoutX="10.0" layoutY="467.0" text="Msgs from server" />
+   </children>
+</AnchorPane>

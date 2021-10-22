@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -18,7 +19,7 @@ public class ChatHandler implements Runnable {
     private final Path root;
     private Path clientDir;
     private static int counter = 0;
-    private final String userName;
+//    private final String userName;
     private final Server server;
     private final DataInputStream dis;
     private final DataOutputStream dos;
@@ -26,19 +27,19 @@ public class ChatHandler implements Runnable {
 
     public ChatHandler(Socket socket, Server server) throws Exception {
         buffer = new byte[BUFFER_SIZE];
-        root = Path.of("server_root");
+        root = Path.of("root-server");
         if (!Files.exists(root)) {
             Files.createDirectory(root);
         }
 
         this.server = server;
-        counter++;
-        userName = "User_" + counter;
-        clientDir = root.resolve(userName);
+//        counter++;
+//        userName = "User_" + counter;
+//        clientDir = root.resolve(userName);
 
-        if (!Files.exists(clientDir)) {
-            Files.createDirectory(clientDir);
-        }
+//        if (!Files.exists(clientDir)) {
+//            Files.createDirectory(clientDir);
+//        }
 
         format = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
         dis = new DataInputStream(socket.getInputStream());
@@ -50,14 +51,21 @@ public class ChatHandler implements Runnable {
         try {
             while (true) {
                 String fileName = dis.readUTF();
+                Path path = Paths.get(dis.readUTF());
+                clientDir = root.resolve(path);
+                if (!Files.exists(clientDir)) {
+                    Files.createDirectory(clientDir);
+                }
+                Path file = clientDir.resolve(fileName);
+                System.out.println(file);
                 long size = dis.readLong();
-                Path path = clientDir.resolve(fileName);
-                try (FileOutputStream fos = new FileOutputStream(path.toFile())) {
+                try (FileOutputStream fos = new FileOutputStream(file.toFile())) {
                     for (int i = 0; i < (size + BUFFER_SIZE - 1) / BUFFER_SIZE; i++) {
                         int read = dis.read(buffer);
                         fos.write(buffer, 0, read);
                     }
                 }
+                clientDir = root;
                 responseOk();
             }
         } catch (Exception e) {
@@ -66,9 +74,9 @@ public class ChatHandler implements Runnable {
         }
     }
 
-    public String getMessage(String msg) {
-        return getTime() + " [" + userName + "]: " + msg;
-    }
+//    public String getMessage(String msg) {
+//        return getTime() + " [" + userName + "]: " + msg;
+//    }
 
     public String getTime() {
         return format.format(new Date());
