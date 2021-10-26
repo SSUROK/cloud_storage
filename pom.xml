@@ -12,6 +12,7 @@
     <modules>
         <module>cloud-storage-oct-2021-server</module>
         <module>cloud-storage-oct-2021-client</module>
+        <module>cloud-storage-oct-2021-external</module>
     </modules>
 
     <properties>
