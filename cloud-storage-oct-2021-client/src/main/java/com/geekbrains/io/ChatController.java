@@ -8,38 +8,46 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
 
 
-import com.geekbrains.classes.Command;
+import com.geekbrains.model.*;
+import com.geekbrains.network.Net;
+import io.netty.channel.ChannelHandlerContext;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Button;
-import javafx.scene.control.ListView;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
+import javafx.scene.input.MouseButton;
+import lombok.extern.slf4j.Slf4j;
 
-public class ChatController implements Initializable {
+import static javafx.application.Platform.runLater;
+
+@Slf4j
+public class  ChatController implements Initializable {
 
     public ListView<String> listLeft;
     public ListView<String> listRight;
     public TextField input;
     public Button upload;
     public Button download;
+    public Button reconnect;
+    public ContextMenu contextMenuLeft;
+    public ContextMenu contextMenuRight;
     private Path rootClient;
     private Path rootServer;
     private Path clientFilePath;
     private Path serverFilePath;
     private byte[] buffer;
-    private DataInputStream dis;
-    private DataOutputStream dos;
+    private Net net;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        buffer = new byte[1024];
+
+        buffer = new byte[8192];
         rootClient = Paths.get("root-client");
         rootServer = Paths.get("root-server");
         clientFilePath = rootClient;
@@ -57,10 +65,89 @@ public class ChatController implements Initializable {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        MenuItem newFolderClient = new MenuItem("New Folder");
+        MenuItem newFolderServer = new MenuItem("New Folder");
+        MenuItem refreshClient = new MenuItem("Refresh");
+        MenuItem refreshServer = new MenuItem("Refresh");
+        contextMenuLeft.getItems().clear();
+        contextMenuRight.getItems().clear();
+        contextMenuLeft.getItems().add(newFolderClient);
+        contextMenuLeft.getItems().add(refreshClient);
+        contextMenuRight.getItems().add(newFolderServer);
+        contextMenuRight.getItems().add(refreshServer);
+
+        newFolderClient.setOnAction(event -> {
+            String name = input.getText();
+            Path nf = clientFilePath.resolve(name);
+            if(!Files.exists(nf)){
+                try {
+                    Files.createDirectory(nf);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                fillFilesInClient();
+            }
+        });
+
+        newFolderServer.setOnAction(event -> {
+            FileMessage folder = FileMessage.builder()
+                    .path(input.getText())
+                    .isFirstButch(true)
+                    .build();
+            net.send(folder);
+            try {
+                net.send(new ListRequest(serverFilePath.toString()));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+
+        refreshClient.setOnAction(event -> {
+            fillFilesInClient();
+        });
+
+        refreshServer.setOnAction(event -> {
+            try {
+                net.send(new ListRequest(serverFilePath.toString()));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+
+
+        listRight.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2 && e.getButton() == MouseButton.PRIMARY) {
+                String fileName = listRight.getSelectionModel().getSelectedItem();
+                if (fileName.equals("Back to previous")){
+                    if (serverFilePath.getParent() != null) {
+                        System.out.println(serverFilePath.getParent());
+                        serverFilePath = serverFilePath.getParent();
+                        try {
+                            net.send(new ListRequest(".."));
+                        } catch (Exception exception) {
+                            exception.printStackTrace();
+                        }
+                    } else {
+                        input.setText("no");
+                    }
+                } else if (Files.isDirectory(serverFilePath.resolve(fileName))) {
+                    serverFilePath = Paths.get(serverFilePath.resolve(fileName).toString());
+                    try {
+                        net.send(new ListRequest(listRight.getSelectionModel().getSelectedItem()));
+                    } catch (Exception exception) {
+                        exception.printStackTrace();
+                    }
+                } else if (!Files.isDirectory(serverFilePath.resolve(fileName))){
+                    download.fire();
+                } else {
+                    input.setText("Select file! Not directory");
+                }
+            }
+        });
 
         // настройка действий списка файлов клиента
         listLeft.setOnMouseClicked(e -> {
-            if (e.getClickCount() == 2) {
+            if (e.getClickCount() == 2 && e.getButton() == MouseButton.PRIMARY) {
                 String fileName = listLeft.getSelectionModel().getSelectedItem();
                 if (fileName.equals("Back to previous")){
                     if (clientFilePath.getParent() != null) {
@@ -88,97 +175,122 @@ public class ChatController implements Initializable {
             }
         });
 
-        //подключение к серверу
-        try {
-            Socket socket = new Socket("localhost", 8189);
-            dis = new DataInputStream(socket.getInputStream());
-            dos = new DataOutputStream(socket.getOutputStream());
-            Thread readThread = new Thread(() -> {
-                try {
-                    while (true) {
-                        String message = dis.readUTF();
-                        Platform.runLater(() -> input.setText(message));
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
+        net = Net.getInstance(this::processMessage); // wait
+    }
+
+    public void reconnect(ActionEvent e){
+        if (!net.isAlive()) {
+            net.kill();
+            net = Net.getInstance(this::processMessage);
+        }
+    }
+
+    private void processMessage(AbstractMessage message) throws Exception {
+        log.debug("Start processing {}", message);
+        switch (message.getType()) {
+
+            case FILE_MESSAGE:
+                FileMessage msg = (FileMessage) message;
+                clientFilePath = rootClient.resolve(msg.getPath());
+                if (!Files.exists(clientFilePath)) {
+                    Files.createDirectory(clientFilePath);
                 }
-            });
-            readThread.setDaemon(true);
-            readThread.start();
-            fillFilesInServer();
-        } catch (IOException e) {
-            e.printStackTrace();
+                log.info("File path {}", clientFilePath);
+                Path file = clientFilePath.resolve(msg.getName());
+
+                if (msg.isFirstButch()) {
+                    Files.deleteIfExists(file);
+                }
+
+                try (FileOutputStream os = new FileOutputStream(file.toFile(), true)) {
+                    os.write(msg.getBytes(), 0, msg.getEndByteNum());
+                }
+
+                fillFilesInClient();
+                break;
+            case LIST_MESSAGE:
+                ListMessage list = (ListMessage) message;
+                runLater(() -> {
+                    listRight.getItems().clear();
+                    listRight.getItems().add("Back to previous");
+                    listRight.getItems().addAll(list.getFiles());
+                });
+                break;
         }
     }
 
-    /*запрос и дальнейшее заполнение списка файлов сервера*/
-    private void fillFilesInServer() throws IOException{
-        listRight.getItems().clear();
-        listRight.getItems().add("Back to previous");
-        Command com = new Command(Command.LIST);
-        sendCommand(com);
-    }
-
-    private void fillFilesInClient() throws Exception {
-        listLeft.getItems().clear();
-        listLeft.getItems().add("Back to previous");
-        List<String> list = Files.list(clientFilePath)
-                .map(p -> p.getFileName().toString())
-                .collect(Collectors.toList());
-        listLeft.getItems().addAll(list);
-    }
-
-    /*отправка команды серверу*/
-    private void sendCommand(Command command) throws IOException {
-//        System.out.println(Arrays.toString(command.getByteArray()));
-        byte[] com = command.getByteArray();
-        dos.writeLong(com.length);
-        for(byte b : com){
-            dos.writeByte(b);
-        }
+    private void fillFilesInClient() {
+        runLater(()->{
+            listLeft.getItems().clear();
+            listLeft.getItems().add("Back to previous");
+            List<String> list = null;
+            try {
+                list = Files.list(clientFilePath)
+                        .map(p -> p.getFileName().toString())
+                        .collect(Collectors.toList());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            listLeft.getItems().addAll(list);
+        });
     }
 
     /*отправка файла серверу*/
-    public void sendMessage(ActionEvent actionEvent) throws IOException {
-        dos.write("file".getBytes(StandardCharsets.UTF_8));
+    public void sendFile(ActionEvent actionEvent) throws IOException{
         String fileName = listLeft.getSelectionModel().getSelectedItem();
         clientFilePath = Paths.get(clientFilePath.resolve(fileName).toString());
         List<Path> paths = new ArrayList<>();
         if (Files.isDirectory(clientFilePath)) {
             paths = directoryParsing(clientFilePath);
-//            paths.forEach(System.out::println);
-//            input.setText("choose file. not directory");
         } else {
             paths.add(clientFilePath);
         }
-//        Path filePath = root.resolve(fileName);
         paths.forEach(p -> {
-            try {
-                if (Files.exists(p)) {
-                    String path;
-                    if (!p.getParent().equals(rootClient)) {
-                        path = p.getParent().toString();
-                        System.out.println(path);
-                        path = path.replace(rootClient.toString() + "/", "");
-                    } else {
-                        path = "";
-                    }
-                    dos.writeUTF(p.getFileName().toString());
-                    dos.writeUTF(path);
-                    dos.writeLong(Files.size(p));
-                    try (FileInputStream fis = new FileInputStream(p.toFile())) {
-                        int read;
-                        while ((read = fis.read(buffer)) != -1) {
-                            dos.write(buffer, 0, read);
-                        }
-                    }
-                    dos.flush();
+            if (Files.exists(p)) {
+                String path;
+                if (!p.getParent().equals(rootClient)) {
+                    path = p.getParent().toString();
+                    path = path.replace(rootClient.toString() + "/", "");
+                } else {
+                    path = "";
                 }
-            } catch (IOException e){
-                e.printStackTrace();
+                boolean isFirstButch = true;
+                long size = 0;
+                try {
+                    size = Files.size(p);
+                } catch (IOException e) {
+                    log.error("e:", e);
+                }
+                try (FileInputStream fis = new FileInputStream(p.toFile())) {
+                    int read;
+                    while ((read = fis.read(buffer)) != -1) {
+                        log.debug("test2");
+//                        log.info(fileName, path, size);
+                        FileMessage message = FileMessage.builder()
+                                .bytes(buffer)
+                                .name(p.getFileName().toString())
+                                .path(path)
+                                .size(size)
+                                .isFirstButch(isFirstButch)
+                                .isFinishBatch(fis.available() <= 0)
+                                .endByteNum(read)
+                                .build();
+                        net.send(message);
+                        isFirstButch = false;
+                    }
+                } catch (Exception e) {
+                    log.error("e:", e);
+                }
             }
         });
         clientFilePath = clientFilePath.getParent();
+    }
+
+    public void requestFile(ActionEvent event){
+        String name = listRight.getSelectionModel().getSelectedItem();
+        serverFilePath = serverFilePath.resolve(name);
+        net.send(new FileRequest(serverFilePath.toString()));
+        serverFilePath = serverFilePath.getParent();
     }
 
     /*представление директории в виде конченых файлов с путями*/
@@ -195,4 +307,9 @@ public class ChatController implements Initializable {
         }
         return paths;
     }
+
+    public void newFolder(ActionEvent event){
+//        if(listRight.)
+    }
+
 }

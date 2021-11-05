@@ -1,6 +1,5 @@
 package com.geekbrains.io;
 
-import com.geekbrains.classes.Command;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -63,21 +62,19 @@ public class ChatHandler implements Runnable {
                 for (int i = 0; i < length; i++){
                     com[i] = dis.readByte();
                 }
-                Command command = new Command(com);
                 /*-----------!------------*/
                 /*определение типа команды*/
-                String operation = command.getCommand();
-                System.out.println(operation);
-                switch (operation){
-                    case Command.DOWNLOAD:
-                        fileReceive();
-                        break;
-                    case Command.LIST:
-                        break;
-                    default:
-                        System.out.println("Unknown");
-                        break;
-                }
+//                System.out.println(operation);
+//                switch (operation){
+//                    case Command.DOWNLOAD:
+//                        fileReceive();
+//                        break;
+//                    case Command.LIST:
+//                        break;
+//                    default:
+//                        System.out.println("Unknown");
+//                        break;
+//                }
 
             }
         } catch (Exception e) {

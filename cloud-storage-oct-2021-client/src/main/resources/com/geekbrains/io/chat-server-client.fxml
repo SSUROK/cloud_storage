@@ -7,13 +7,46 @@
 
 <AnchorPane prefHeight="538.0" prefWidth="344.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.geekbrains.io.ChatController">
    <children>
-      <Button fx:id="download" layoutX="219.0" layoutY="497.0" mnemonicParsing="false" text="Download" />
-      <Button fx:id="upload" layoutX="61.0" layoutY="497.0" mnemonicParsing="false" onAction="#sendMessage" text="Upload" />
-      <Label layoutX="75.0" layoutY="6.0" text="You" />
-      <Label layoutX="241.0" layoutY="6.0" text="Server" />
-      <ListView fx:id="listLeft" layoutY="23.0" prefHeight="428.0" prefWidth="172.0" />
-      <ListView fx:id="listRight" layoutX="173.0" layoutY="23.0" prefHeight="428.0" prefWidth="172.0" />
-      <TextField fx:id="input" layoutX="110.0" layoutY="462.0" prefHeight="27.0" prefWidth="227.0" />
-      <Label layoutX="10.0" layoutY="467.0" text="Msgs from server" />
+      <Button fx:id="download" layoutX="77.0" layoutY="497.0" maxWidth="100.0" minWidth="50.0" mnemonicParsing="false" onAction="#requestFile" text="Download">
+         <font>
+            <Font name="Comic Sans MS" size="13.0" />
+         </font></Button>
+      <Button fx:id="upload" layoutX="8.0" layoutY="497.0" maxWidth="100.0" minWidth="50.0" mnemonicParsing="false" onAction="#sendFile" text="Upload">
+         <font>
+            <Font name="Comic Sans MS" size="13.0" />
+         </font></Button>
+      <Label layoutX="75.0" layoutY="6.0" text="You">
+         <font>
+            <Font name="Comic Sans MS" size="13.0" />
+         </font></Label>
+      <Label layoutX="241.0" layoutY="6.0" text="Server">
+         <font>
+            <Font name="Comic Sans MS" size="13.0" />
+         </font></Label>
+      <ListView fx:id="listLeft" layoutY="23.0" prefHeight="428.0" prefWidth="172.0">
+         <contextMenu>
+            <ContextMenu fx:id="contextMenuLeft">
+              <items>
+                <MenuItem mnemonicParsing="false" text="Unspecified Action" />
+              </items>
+            </ContextMenu>
+         </contextMenu></ListView>
+      <ListView fx:id="listRight" layoutX="173.0" layoutY="23.0" prefHeight="428.0" prefWidth="172.0">
+         <contextMenu>
+            <ContextMenu fx:id="contextMenuRight">
+              <items>
+                <MenuItem mnemonicParsing="false" text="Unspecified Action" />
+              </items>
+            </ContextMenu>
+         </contextMenu></ListView>
+      <TextField fx:id="input" layoutX="127.0" layoutY="462.0" prefHeight="27.0" prefWidth="210.0" />
+      <Label layoutX="14.0" layoutY="466.0" text="Msgs from server">
+         <font>
+            <Font name="Comic Sans MS" size="13.0" />
+         </font></Label>
+      <Button fx:id="reconnect" layoutX="259.0" layoutY="497.0" maxWidth="100.0" minWidth="50.0" mnemonicParsing="false" onAction="#reconnect" text="Reconnect">
+         <font>
+            <Font name="Comic Sans MS" size="13.0" />
+         </font></Button>
    </children>
 </AnchorPane>
