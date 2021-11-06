@@ -22,11 +22,13 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.input.MouseButton;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import static javafx.application.Platform.runLater;
 
 @Slf4j
+@Setter
 public class  ChatController implements Initializable {
 
     public ListView<String> listLeft;
@@ -69,12 +71,17 @@ public class  ChatController implements Initializable {
         MenuItem newFolderServer = new MenuItem("New Folder");
         MenuItem refreshClient = new MenuItem("Refresh");
         MenuItem refreshServer = new MenuItem("Refresh");
+        MenuItem deleteClient = new MenuItem("Delete");
+        MenuItem deleteServer = new MenuItem("Delete");
+
         contextMenuLeft.getItems().clear();
         contextMenuRight.getItems().clear();
         contextMenuLeft.getItems().add(newFolderClient);
         contextMenuLeft.getItems().add(refreshClient);
+        contextMenuLeft.getItems().add(deleteClient);
         contextMenuRight.getItems().add(newFolderServer);
         contextMenuRight.getItems().add(refreshServer);
+        contextMenuRight.getItems().add(deleteServer);
 
         newFolderClient.setOnAction(event -> {
             String name = input.getText();
@@ -95,11 +102,7 @@ public class  ChatController implements Initializable {
                     .isFirstButch(true)
                     .build();
             net.send(folder);
-            try {
-                net.send(new ListRequest(serverFilePath.toString()));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            fillFilesInServer();
         });
 
         refreshClient.setOnAction(event -> {
@@ -107,20 +110,29 @@ public class  ChatController implements Initializable {
         });
 
         refreshServer.setOnAction(event -> {
-            try {
-                net.send(new ListRequest(serverFilePath.toString()));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            fillFilesInServer();
         });
 
+        deleteClient.setOnAction(event -> {
+            String name = listLeft.getSelectionModel().getSelectedItem();
+            try {
+                Files.delete(clientFilePath.resolve(name));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            fillFilesInClient();
+        });
+
+        deleteServer.setOnAction(event -> {
+            net.send(new FileDelete(serverFilePath.resolve(listRight.getSelectionModel().getSelectedItem()).toString()));
+            fillFilesInServer();
+        });
 
         listRight.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2 && e.getButton() == MouseButton.PRIMARY) {
                 String fileName = listRight.getSelectionModel().getSelectedItem();
                 if (fileName.equals("Back to previous")){
                     if (serverFilePath.getParent() != null) {
-                        System.out.println(serverFilePath.getParent());
                         serverFilePath = serverFilePath.getParent();
                         try {
                             net.send(new ListRequest(".."));
@@ -180,6 +192,7 @@ public class  ChatController implements Initializable {
 
     public void reconnect(ActionEvent e){
         if (!net.isAlive()) {
+            log.debug("Trying to reconnect");
             net.kill();
             net = Net.getInstance(this::processMessage);
         }
@@ -216,6 +229,18 @@ public class  ChatController implements Initializable {
                     listRight.getItems().addAll(list.getFiles());
                 });
                 break;
+            case SERVER_OFFLINE:
+                runLater(()-> {
+                    listRight.getItems().clear();
+                    input.setText("Server offline");
+                });
+                break;
+            case SERVER_ONLINE:
+                log.info("connected");
+                runLater(()->{
+                    input.setText("Connected");
+                });
+                break;
         }
     }
 
@@ -233,6 +258,14 @@ public class  ChatController implements Initializable {
             }
             listLeft.getItems().addAll(list);
         });
+    }
+
+    private void fillFilesInServer(){
+        try {
+            net.send(new ListRequest(serverFilePath.toString()));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     /*отправка файла серверу*/
@@ -306,10 +339,6 @@ public class  ChatController implements Initializable {
             }
         }
         return paths;
-    }
-
-    public void newFolder(ActionEvent event){
-//        if(listRight.)
     }
 
 }

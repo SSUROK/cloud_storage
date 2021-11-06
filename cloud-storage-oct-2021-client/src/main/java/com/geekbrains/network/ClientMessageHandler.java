@@ -5,7 +5,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
+ @Slf4j
 public class ClientMessageHandler extends SimpleChannelInboundHandler<AbstractMessage> {
 
     private Callback callback;

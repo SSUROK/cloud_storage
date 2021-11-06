@@ -43,16 +43,31 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
                 break;
             case LIST_REQUEST:
                 ListRequest listRequest = (ListRequest) msg;
-                if (listRequest.getDir().equals("..")){
-                    rootServer = rootServer.getParent();
-                } else {
-                    if (!listRequest.getDir().contains(rootServer.toString())) {
-                        rootServer = rootServer.resolve(listRequest.getDir());
-                    } else { rootServer = Paths.get(listRequest.getDir());}
-                }
-                ctx.writeAndFlush(new ListMessage(rootServer));
+                listRequest(listRequest, ctx);
+                break;
+            case FILE_DELETE:
+                fileDelete((FileDelete) msg);
                 break;
         }
+    }
+
+    private void fileDelete(FileDelete fileDelete){
+        try {
+            Files.delete(Paths.get(fileDelete.getDir()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void listRequest(ListRequest listRequest, ChannelHandlerContext ctx) throws Exception{
+        if (listRequest.getDir().equals("..")){
+            rootServer = rootServer.getParent();
+        } else {
+            if (!listRequest.getDir().contains(rootServer.toString())) {
+                rootServer = rootServer.resolve(listRequest.getDir());
+            } else { rootServer = Paths.get(listRequest.getDir());}
+        }
+        ctx.writeAndFlush(new ListMessage(rootServer));
     }
 
     private void sendFile(FileRequest msg, ChannelHandlerContext ctx) {
@@ -98,7 +113,6 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
                 }
             }
         });
-        System.out.println(serverFilePath);
 //        serverFilePath = serverFilePath.getParent();
     }
 

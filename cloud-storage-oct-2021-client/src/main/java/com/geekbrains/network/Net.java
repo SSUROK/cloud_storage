@@ -2,6 +2,8 @@ package com.geekbrains.network;
 
 
 import com.geekbrains.model.AbstractMessage;
+import com.geekbrains.model.CommandType;
+import com.geekbrains.model.ServerStatus;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -43,10 +45,16 @@ public class Net {
                         });
                 ChannelFuture future = bootstrap.connect("localhost", 8189).sync();
                 log.debug("Network start listening");
+                callback.callback(ServerStatus.builder().status(CommandType.SERVER_ONLINE).build());
                 future.channel().closeFuture().sync();
             } catch (Exception e) {
                 log.error("e", e);
             } finally {
+                try {
+                    callback.callback(ServerStatus.builder().name("server_offline").status(CommandType.SERVER_OFFLINE).build());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
                 worker.shutdownGracefully();
             }
         });
@@ -62,7 +70,7 @@ public class Net {
         netChannel.close();
         thread.setDaemon(false);
         thread.interrupt();
-        System.out.println(thread.isAlive());
+        INSTANCE = null;
     }
 
     public static Net getInstance(Callback callback) {
