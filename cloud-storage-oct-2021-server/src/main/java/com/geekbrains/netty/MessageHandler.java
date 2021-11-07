@@ -26,6 +26,9 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         rootServer = Paths.get("root-server");
+        if (!Files.exists(rootServer)){
+            Files.createDirectory(rootServer);
+        }
         serverFilePath = rootServer;
         ctx.writeAndFlush(new ListMessage(rootServer));
         buffer = new byte[8192];
