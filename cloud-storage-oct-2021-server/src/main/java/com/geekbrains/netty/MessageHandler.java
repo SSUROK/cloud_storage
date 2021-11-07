@@ -33,7 +33,7 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, AbstractMessage msg) throws Exception {
-        log.debug("Start processing {}", msg);
+//        log.debug("Start processing {}", msg);
         switch (msg.getType()) {
             case FILE_MESSAGE:
                 processFile((FileMessage) msg, ctx);

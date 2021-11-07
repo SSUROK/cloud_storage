@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.scene.web.*?>
+<?import javafx.scene.*?>
 <?import javafx.scene.text.*?>
 <?import java.lang.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<AnchorPane prefHeight="538.0" prefWidth="344.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.geekbrains.io.ChatController">
+<AnchorPane fx:id="anchorPane" prefHeight="538.0" prefWidth="344.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.geekbrains.io.ChatController">
    <children>
       <Button fx:id="download" layoutX="77.0" layoutY="497.0" maxWidth="100.0" minWidth="50.0" mnemonicParsing="false" onAction="#requestFile" text="Download">
          <font>
@@ -26,17 +28,22 @@
       <ListView fx:id="listLeft" layoutY="23.0" prefHeight="428.0" prefWidth="172.0">
          <contextMenu>
             <ContextMenu fx:id="contextMenuLeft">
-              <items>
-                <MenuItem mnemonicParsing="false" text="Unspecified Action" />
-              </items>
+               <items>
+                  <MenuItem fx:id="newFolderClient" mnemonicParsing="false" onAction="#newFolderClient" text="New Folder" />
+                  <MenuItem fx:id="refreshClient" mnemonicParsing="false" onAction="#refreshClient" text="Refresh" />
+                  <MenuItem fx:id="deleteClient" mnemonicParsing="false" onAction="#deleteClient" text="Delete" />
+               </items>
             </ContextMenu>
-         </contextMenu></ListView>
+         </contextMenu>
+      </ListView>
       <ListView fx:id="listRight" layoutX="173.0" layoutY="23.0" prefHeight="428.0" prefWidth="172.0">
          <contextMenu>
             <ContextMenu fx:id="contextMenuRight">
-              <items>
-                <MenuItem mnemonicParsing="false" text="Unspecified Action" />
-              </items>
+               <items>
+                  <MenuItem fx:id="newFolderServer" mnemonicParsing="false" onAction="#newFolderServer" text="New Folder" />
+                  <MenuItem fx:id="refreshServer" mnemonicParsing="false" onAction="#refreshServer" text="Refresh" />
+                  <MenuItem fx:id="deleteServer" mnemonicParsing="false" onAction="#deleteServer" text="Delete" />
+               </items>
             </ContextMenu>
          </contextMenu></ListView>
       <TextField fx:id="input" layoutX="127.0" layoutY="462.0" prefHeight="27.0" prefWidth="210.0" />
@@ -48,5 +55,6 @@
          <font>
             <Font name="Comic Sans MS" size="13.0" />
          </font></Button>
+      <ProgressBar fx:id="progressBar" layoutX="11.0" layoutY="431.0" prefHeight="20.0" prefWidth="324.0" progress="0.0" />
    </children>
 </AnchorPane>

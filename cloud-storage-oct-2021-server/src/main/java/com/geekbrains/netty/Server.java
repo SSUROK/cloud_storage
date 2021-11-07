@@ -34,6 +34,7 @@ public class Server {
                     });
             ChannelFuture future = bootstrap.bind(8189).sync();
             log.debug("Server started...");
+            log.info(String.valueOf(Thread.activeCount()));
             future.channel().closeFuture().sync(); // block
         } catch (Exception e) {
             log.error("error: ", e);

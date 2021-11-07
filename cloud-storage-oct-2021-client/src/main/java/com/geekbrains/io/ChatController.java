@@ -10,6 +10,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 
@@ -17,11 +19,14 @@ import com.geekbrains.model.*;
 import com.geekbrains.network.Net;
 import io.netty.channel.ChannelHandlerContext;
 import javafx.application.Platform;
+import javafx.concurrent.WorkerStateEvent;
 import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.input.MouseButton;
+import javafx.scene.layout.AnchorPane;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,7 +34,7 @@ import static javafx.application.Platform.runLater;
 
 @Slf4j
 @Setter
-public class  ChatController implements Initializable {
+public class ChatController implements Initializable {
 
     public ListView<String> listLeft;
     public ListView<String> listRight;
@@ -39,6 +44,7 @@ public class  ChatController implements Initializable {
     public Button reconnect;
     public ContextMenu contextMenuLeft;
     public ContextMenu contextMenuRight;
+    public ProgressBar progressBar;
     private Path rootClient;
     private Path rootServer;
     private Path clientFilePath;
@@ -67,66 +73,8 @@ public class  ChatController implements Initializable {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        MenuItem newFolderClient = new MenuItem("New Folder");
-        MenuItem newFolderServer = new MenuItem("New Folder");
-        MenuItem refreshClient = new MenuItem("Refresh");
-        MenuItem refreshServer = new MenuItem("Refresh");
-        MenuItem deleteClient = new MenuItem("Delete");
-        MenuItem deleteServer = new MenuItem("Delete");
 
-        contextMenuLeft.getItems().clear();
-        contextMenuRight.getItems().clear();
-        contextMenuLeft.getItems().add(newFolderClient);
-        contextMenuLeft.getItems().add(refreshClient);
-        contextMenuLeft.getItems().add(deleteClient);
-        contextMenuRight.getItems().add(newFolderServer);
-        contextMenuRight.getItems().add(refreshServer);
-        contextMenuRight.getItems().add(deleteServer);
-
-        newFolderClient.setOnAction(event -> {
-            String name = input.getText();
-            Path nf = clientFilePath.resolve(name);
-            if(!Files.exists(nf)){
-                try {
-                    Files.createDirectory(nf);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                fillFilesInClient();
-            }
-        });
-
-        newFolderServer.setOnAction(event -> {
-            FileMessage folder = FileMessage.builder()
-                    .path(input.getText())
-                    .isFirstButch(true)
-                    .build();
-            net.send(folder);
-            fillFilesInServer();
-        });
-
-        refreshClient.setOnAction(event -> {
-            fillFilesInClient();
-        });
-
-        refreshServer.setOnAction(event -> {
-            fillFilesInServer();
-        });
-
-        deleteClient.setOnAction(event -> {
-            String name = listLeft.getSelectionModel().getSelectedItem();
-            try {
-                Files.delete(clientFilePath.resolve(name));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            fillFilesInClient();
-        });
-
-        deleteServer.setOnAction(event -> {
-            net.send(new FileDelete(serverFilePath.resolve(listRight.getSelectionModel().getSelectedItem()).toString()));
-            fillFilesInServer();
-        });
+        progressBar.setVisible(false);
 
         listRight.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2 && e.getButton() == MouseButton.PRIMARY) {
@@ -188,6 +136,7 @@ public class  ChatController implements Initializable {
         });
 
         net = Net.getInstance(this::processMessage); // wait
+        log.info(String.valueOf(Thread.activeCount()));
     }
 
     public void reconnect(ActionEvent e){
@@ -199,7 +148,7 @@ public class  ChatController implements Initializable {
     }
 
     private void processMessage(AbstractMessage message) throws Exception {
-        log.debug("Start processing {}", message);
+//        log.debug("Start processing {}", message);
         switch (message.getType()) {
 
             case FILE_MESSAGE:
@@ -271,52 +220,80 @@ public class  ChatController implements Initializable {
     /*отправка файла серверу*/
     public void sendFile(ActionEvent actionEvent) throws IOException{
         String fileName = listLeft.getSelectionModel().getSelectedItem();
-        clientFilePath = Paths.get(clientFilePath.resolve(fileName).toString());
-        List<Path> paths = new ArrayList<>();
-        if (Files.isDirectory(clientFilePath)) {
-            paths = directoryParsing(clientFilePath);
-        } else {
-            paths.add(clientFilePath);
-        }
-        paths.forEach(p -> {
-            if (Files.exists(p)) {
-                String path;
-                if (!p.getParent().equals(rootClient)) {
-                    path = p.getParent().toString();
-                    path = path.replace(rootClient.toString() + "/", "");
-                } else {
-                    path = "";
-                }
-                boolean isFirstButch = true;
-                long size = 0;
-                try {
-                    size = Files.size(p);
-                } catch (IOException e) {
-                    log.error("e:", e);
-                }
-                try (FileInputStream fis = new FileInputStream(p.toFile())) {
-                    int read;
-                    while ((read = fis.read(buffer)) != -1) {
-                        log.debug("test2");
-//                        log.info(fileName, path, size);
-                        FileMessage message = FileMessage.builder()
-                                .bytes(buffer)
-                                .name(p.getFileName().toString())
-                                .path(path)
-                                .size(size)
-                                .isFirstButch(isFirstButch)
-                                .isFinishBatch(fis.available() <= 0)
-                                .endByteNum(read)
-                                .build();
-                        net.send(message);
-                        isFirstButch = false;
+        progressBar.progressProperty().unbind();
+        runLater(()->progressBar.setVisible(true));
+        ExecutorService executor = Executors.newFixedThreadPool(5);
+        SendFile sf = SendFile.builder()
+                .name(fileName)
+                .net(net)
+                .rootPath(rootClient)
+                .path(clientFilePath)
+                .progressBar(progressBar)
+                .build();
+        sf.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, //
+                new EventHandler<WorkerStateEvent>() {
+
+                    @Override
+                    public void handle(WorkerStateEvent t) {
+                        fillFilesInServer();
                     }
-                } catch (Exception e) {
-                    log.error("e:", e);
-                }
-            }
-        });
-        clientFilePath = clientFilePath.getParent();
+                });
+        executor.execute(new Thread(sf, fileName));
+        progressBar.setProgress(0);
+        runLater(()-> progressBar.setVisible(false));
+//        clientFilePath = Paths.get(clientFilePath.resolve(fileName).toString());
+//        runLater(()->progressBar.setVisible(true));
+//        List<Path> paths = new ArrayList<>();
+//        if (Files.isDirectory(clientFilePath)) {
+//            paths = directoryParsing(clientFilePath);
+//        } else {
+//            paths.add(clientFilePath);
+//        }
+//        paths.forEach(p -> {
+//            if (Files.exists(p)) {
+//                String path;
+//                if (!p.getParent().equals(rootClient)) {
+//                    path = p.getParent().toString();
+//                    path = path.replace(rootClient.toString() + "/", "");
+//                } else {
+//                    path = "";
+//                }
+//                boolean isFirstButch = true;
+//                long size = 0;
+//                try {
+//                    size = Files.size(p);
+//                    System.out.println("size " + size);
+//                } catch (IOException e) {
+//                    log.error("e:", e);
+//                }
+//                try (FileInputStream fis = new FileInputStream(p.toFile())) {
+//                    int read;
+//                    while ((read = fis.read(buffer)) != -1) {
+////                        log.info(fileName, path, size);
+//                        FileMessage message = FileMessage.builder()
+//                                .bytes(buffer)
+//                                .name(p.getFileName().toString())
+//                                .path(path)
+//                                .size(size)
+//                                .isFirstButch(isFirstButch)
+//                                .isFinishBatch(fis.available() <= 0)
+//                                .endByteNum(read)
+//                                .build();
+//                        net.send(message);
+//                        int r = read;
+////                        System.out.println(read);
+////                        runLater(()->{
+////                            progressBar.setProgress((double) r/buffer.length);
+////                        });
+//                        isFirstButch = false;
+//                    }
+//                } catch (Exception e) {
+//                    log.error("e:", e);
+//                }
+//            }
+//        });
+//        progressBar.setVisible(false);
+//        clientFilePath = clientFilePath.getParent();
     }
 
     public void requestFile(ActionEvent event){
@@ -341,4 +318,48 @@ public class  ChatController implements Initializable {
         return paths;
     }
 
+    public void newFolderServer(ActionEvent event) {
+        FileMessage folder = FileMessage.builder()
+                .path(input.getText())
+                .isFirstButch(true)
+                .build();
+        net.send(folder);
+        fillFilesInServer();
+    }
+
+    public void refreshServer(ActionEvent event) {
+        fillFilesInServer();
+    }
+
+    public void deleteServer(ActionEvent event) {
+        net.send(new FileDelete(serverFilePath.resolve(listRight.getSelectionModel().getSelectedItem()).toString()));
+        fillFilesInServer();
+    }
+
+    public void newFolderClient(ActionEvent event) {
+        fillFilesInClient();
+    }
+
+    public void refreshClient(ActionEvent event) {
+        String name = input.getText();
+        Path nf = clientFilePath.resolve(name);
+        if(!Files.exists(nf)){
+            try {
+                Files.createDirectory(nf);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            fillFilesInClient();
+        }
+    }
+
+    public void deleteClient(ActionEvent event) {
+        String name = listLeft.getSelectionModel().getSelectedItem();
+        try {
+            Files.delete(clientFilePath.resolve(name));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        fillFilesInClient();
+    }
 }
