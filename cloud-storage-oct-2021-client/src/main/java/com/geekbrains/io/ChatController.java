@@ -1,32 +1,27 @@
 package com.geekbrains.io;
 
 import java.io.*;
-import java.net.Socket;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 
 import com.geekbrains.model.*;
 import com.geekbrains.network.Net;
-import io.netty.channel.ChannelHandlerContext;
-import javafx.application.Platform;
-import javafx.concurrent.WorkerStateEvent;
 import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
-import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.AnchorPane;
+import javafx.stage.Stage;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -36,6 +31,7 @@ import static javafx.application.Platform.runLater;
 @Setter
 public class ChatController implements Initializable {
 
+    public AnchorPane anchorPane;
     public ListView<String> listLeft;
     public ListView<String> listRight;
     public TextField input;
@@ -51,6 +47,9 @@ public class ChatController implements Initializable {
     private Path serverFilePath;
     private byte[] buffer;
     private Net net;
+    private Stage stage;
+    private Parent parent;
+    private UploadController uploadController;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -220,27 +219,39 @@ public class ChatController implements Initializable {
     /*отправка файла серверу*/
     public void sendFile(ActionEvent actionEvent) throws IOException{
         String fileName = listLeft.getSelectionModel().getSelectedItem();
-        progressBar.progressProperty().unbind();
-        runLater(()->progressBar.setVisible(true));
-        ExecutorService executor = Executors.newFixedThreadPool(5);
-        SendFile sf = SendFile.builder()
-                .name(fileName)
-                .net(net)
-                .rootPath(rootClient)
-                .path(clientFilePath)
-                .progressBar(progressBar)
-                .build();
-        sf.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, //
-                new EventHandler<WorkerStateEvent>() {
+        stage = new Stage();
+        parent = FXMLLoader.load(getClass().getResource("upload-screen.fxml"));
+        stage.setTitle("Upload");
+        stage.setResizable(false);
+        stage.setScene(new Scene(parent));
+        stage.show();
+        uploadController = new UploadController();
+        uploadController.sendFile(fileName, net, rootClient, clientFilePath);
 
-                    @Override
-                    public void handle(WorkerStateEvent t) {
-                        fillFilesInServer();
-                    }
-                });
-        executor.execute(new Thread(sf, fileName));
-        progressBar.setProgress(0);
-        runLater(()-> progressBar.setVisible(false));
+//        progressBar.progressProperty().unbind();
+//        runLater(()->progressBar.setVisible(true));
+//        ExecutorService executor = Executors.newFixedThreadPool(5);
+//        SendFile sf = SendFile.builder()
+//                .fileName(fileName)
+//                .net(net)
+//                .rootPath(rootClient)
+//                .path(clientFilePath)
+//                .progressBar(progressBar)
+//                .name(String.valueOf(Math.random()))
+//                .build();
+//        sf.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, //
+//                new EventHandler<WorkerStateEvent>() {
+//
+//                    @Override
+//                    public void handle(WorkerStateEvent t) {
+//                        fillFilesInServer();
+//                    }
+//                });
+//        executor.execute(new Thread(sf, fileName));
+//        progressBar.setProgress(0);
+//        runLater(()-> progressBar.setVisible(false));
+
+
 //        clientFilePath = Paths.get(clientFilePath.resolve(fileName).toString());
 //        runLater(()->progressBar.setVisible(true));
 //        List<Path> paths = new ArrayList<>();
@@ -337,10 +348,6 @@ public class ChatController implements Initializable {
     }
 
     public void newFolderClient(ActionEvent event) {
-        fillFilesInClient();
-    }
-
-    public void refreshClient(ActionEvent event) {
         String name = input.getText();
         Path nf = clientFilePath.resolve(name);
         if(!Files.exists(nf)){
@@ -351,6 +358,10 @@ public class ChatController implements Initializable {
             }
             fillFilesInClient();
         }
+    }
+
+    public void refreshClient(ActionEvent event) {
+        fillFilesInClient();
     }
 
     public void deleteClient(ActionEvent event) {

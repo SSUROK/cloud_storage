@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.text.*?>
+<?import javafx.scene.shape.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import java.lang.*?>
+<?import javafx.scene.layout.*?>
+
+
+<AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="118.0" prefWidth="366.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.geekbrains.io.UploadController">
+   <children>
+      <ProgressBar fx:id="progressBar" layoutX="14.0" layoutY="14.0" prefHeight="20.0" prefWidth="339.0" progress="0.0" />
+      <Label fx:id="activeFile" layoutX="14.0" layoutY="42.0" prefHeight="28.0" prefWidth="226.0" text="Label">
+         <font>
+            <Font name="Comic Sans MS" size="13.0" />
+         </font>
+      </Label>
+      <Button fx:id="cancel" layoutX="282.0" layoutY="77.0" mnemonicParsing="false" text="Cancel">
+         <font>
+            <Font name="Comic Sans MS" size="13.0" />
+         </font>
+      </Button>
+   </children>
+</AnchorPane>

@@ -20,6 +20,8 @@ public class App extends Application {
             }
         });
         Parent parent = FXMLLoader.load(getClass().getResource("chat-server-client.fxml"));
+        primaryStage.setTitle("Cloud");
+        primaryStage.setResizable(false);
         primaryStage.setScene(new Scene(parent));
         primaryStage.show();
     }

@@ -18,22 +18,22 @@ import java.util.List;
 
 import static javafx.application.Platform.runLater;
 
-//@Slf4j
+@Slf4j
 @Builder
 public class SendFile extends Task<List<Path>> {
 
     private byte[] buffer;
     private String name;
+    private String fileName;
     private Path path;
     private Path rootPath;
     private Net net;
-    public ProgressBar progressBar;
 
     @Override
     protected List<Path> call() throws Exception {
         buffer = new byte[8192];
         List<Path> paths = new ArrayList<>();
-        path = Paths.get(path.resolve(name).toString());
+        path = Paths.get(path.resolve(fileName).toString());
         if (Files.isDirectory(path)) {
             paths = directoryParsing(path);
         } else {
@@ -53,7 +53,7 @@ public class SendFile extends Task<List<Path>> {
                 try {
                     size = Files.size(p);
                 } catch (IOException e) {
-//                    log.error("e:", e);
+                    log.error("e:", e);
                 }
                 try (FileInputStream fis = new FileInputStream(p.toFile())) {
                     int read;
@@ -70,7 +70,6 @@ public class SendFile extends Task<List<Path>> {
                                 .build();
                         net.send(message);
                         this.updateProgress(read, size);
-                        runLater(()-> progressBar.setProgress(this.getProgress()));
 //                        System.out.println(read);
 //                        runLater(()->{
 //                            progressBar.setProgress((double) r/buffer.length);
@@ -84,7 +83,7 @@ public class SendFile extends Task<List<Path>> {
         });
 //        progressBar.setVisible(false);
 //        clientFilePath = clientFilePath.getParent();
-        return null;
+        return paths;
     }
 
     public void setFileToSend(
@@ -92,7 +91,7 @@ public class SendFile extends Task<List<Path>> {
             Path path,
             Path rootPath,
             Net net){
-        this.name = fileName;
+        this.fileName = fileName;
         this.path = path;
         this.rootPath = rootPath;
         this.net = net;
