@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage> {
@@ -33,7 +34,7 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, AbstractMessage msg) throws Exception {
-        log.debug("Start processing {}", msg);
+//        log.debug("Start processing {}", msg);
         switch (msg.getType()) {
             case FILE_MESSAGE:
                 processFile((FileMessage) msg, ctx);
@@ -104,6 +105,7 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
                                     .build();
                             ctx.writeAndFlush(message);
                             isFirstButch = false;
+                            TimeUnit.MILLISECONDS.sleep(1);
                         }
                     } catch (Exception e) {
                         log.error("e:", e);

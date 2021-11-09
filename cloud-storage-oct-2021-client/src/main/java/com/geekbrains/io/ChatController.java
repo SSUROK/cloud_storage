@@ -10,6 +10,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 
@@ -49,11 +50,12 @@ public class  ChatController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
 
-        buffer = new byte[8192];
+        buffer = new byte[262144];
         rootClient = Paths.get("root-client");
         rootServer = Paths.get("root-server");
         clientFilePath = rootClient;
         serverFilePath = rootServer;
+
         if (!Files.exists(rootClient)) {
             try {
                 Files.createDirectory(rootClient);
@@ -297,8 +299,6 @@ public class  ChatController implements Initializable {
                 try (FileInputStream fis = new FileInputStream(p.toFile())) {
                     int read;
                     while ((read = fis.read(buffer)) != -1) {
-                        log.debug("test2");
-//                        log.info(fileName, path, size);
                         FileMessage message = FileMessage.builder()
                                 .bytes(buffer)
                                 .name(p.getFileName().toString())
@@ -310,6 +310,7 @@ public class  ChatController implements Initializable {
                                 .build();
                         net.send(message);
                         isFirstButch = false;
+                        TimeUnit.MILLISECONDS.sleep(1);// если не добавить эту строку, то сервер не будет успевать за клиентом и будет резать файлы))
                     }
                 } catch (Exception e) {
                     log.error("e:", e);
