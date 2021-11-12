@@ -7,16 +7,14 @@
 <?import java.lang.*?>
 <?import javafx.scene.layout.*?>
 
-
-<AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="118.0" prefWidth="366.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.geekbrains.io.UploadController">
+<AnchorPane fx:id="anchorPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="120.0" prefWidth="420.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.geekbrains.io.UploadController">
    <children>
-      <ProgressBar fx:id="progressBar" layoutX="14.0" layoutY="14.0" prefHeight="20.0" prefWidth="339.0" progress="0.0" />
-      <Label fx:id="activeFile" layoutX="14.0" layoutY="42.0" prefHeight="28.0" prefWidth="226.0" text="Label">
+      <Button fx:id="cancel" layoutX="346.0" layoutY="77.0" minWidth="60.0" mnemonicParsing="false" onAction="#cancel" text="Cancel">
          <font>
             <Font name="Comic Sans MS" size="13.0" />
          </font>
-      </Label>
-      <Button fx:id="cancel" layoutX="282.0" layoutY="77.0" mnemonicParsing="false" text="Cancel">
+      </Button>
+      <Button fx:id="okButton" layoutX="279.0" layoutY="77.0" minWidth="60.0" mnemonicParsing="false" onAction="#accept" text="OK">
          <font>
             <Font name="Comic Sans MS" size="13.0" />
          </font>

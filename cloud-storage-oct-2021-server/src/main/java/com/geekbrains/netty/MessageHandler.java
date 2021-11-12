@@ -13,7 +13,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage> {
@@ -23,15 +25,19 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
     private Path serverFilePath;
     private Path clientDir;
 
+//    private String fileName;
+//    private byte[] cache;
+//    private int posFrom;
+//    private Path file;
+//    private int lastPos;
+//    private int k = 0;
+
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         rootServer = Paths.get("root-server");
-        if (!Files.exists(rootServer)){
-            Files.createDirectory(rootServer);
-        }
         serverFilePath = rootServer;
         ctx.writeAndFlush(new ListMessage(rootServer));
-        buffer = new byte[8192];
+        buffer = new byte[65536];
     }
 
     @Override
@@ -46,31 +52,41 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
                 break;
             case LIST_REQUEST:
                 ListRequest listRequest = (ListRequest) msg;
-                listRequest(listRequest, ctx);
+                listRequest(listRequest.getDir(), ctx);
                 break;
             case FILE_DELETE:
-                fileDelete((FileDelete) msg);
+                FileDelete file = (FileDelete) msg;
+                deleteFile(serverFilePath.resolve(file.getDir()));
+                listRequest(serverFilePath.toString(), ctx);
                 break;
         }
     }
 
-    private void fileDelete(FileDelete fileDelete){
+    private void deleteFile(Path path){
         try {
-            Files.delete(Paths.get(fileDelete.getDir()));
+            if(Files.isDirectory(path)) {
+                List<File> contains = Arrays.asList(path.toFile().listFiles());
+                if (!contains.isEmpty()) {
+                    contains.forEach(e -> {
+                        deleteFile(e.toPath());
+                    });
+                }
+            }
+            Files.delete(path);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void listRequest(ListRequest listRequest, ChannelHandlerContext ctx) throws Exception{
-        if (listRequest.getDir().equals("..")){
-            rootServer = rootServer.getParent();
+    private void listRequest(String dir, ChannelHandlerContext ctx) throws Exception{
+        if (dir.equals("..") && serverFilePath.getParent() != null){
+            serverFilePath = serverFilePath.getParent();
         } else {
-            if (!listRequest.getDir().contains(rootServer.toString())) {
-                rootServer = rootServer.resolve(listRequest.getDir());
-            } else { rootServer = Paths.get(listRequest.getDir());}
+            if (!dir.contains(rootServer.toString())) {
+                serverFilePath = serverFilePath.resolve(dir);
+            } else { serverFilePath = Paths.get(dir);}
         }
-        ctx.writeAndFlush(new ListMessage(rootServer));
+        ctx.writeAndFlush(new ListMessage(serverFilePath));
     }
 
     private void sendFile(FileRequest msg, ChannelHandlerContext ctx) {
@@ -82,6 +98,7 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
             paths.add(filePath);
         }
         paths.forEach(p -> {
+            int k = 0;
             if (Files.exists(p)) {
                 String path;
                 if (!p.getParent().equals(rootServer)) {
@@ -96,6 +113,7 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
                     try (FileInputStream is = new FileInputStream(p.toFile())) {
                         int read;
                         while ((read = is.read(buffer)) != -1) {
+                            k++;
                             FileMessage message = FileMessage.builder()
                                     .bytes(buffer)
                                     .name(p.getFileName().toString())
@@ -107,6 +125,7 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
                                     .build();
                             ctx.writeAndFlush(message);
                             isFirstButch = false;
+                            TimeUnit.MILLISECONDS.sleep(1);
                         }
                     } catch (Exception e) {
                         log.error("e:", e);
@@ -120,7 +139,6 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
     }
 
     private void processFile(FileMessage msg, ChannelHandlerContext ctx) throws Exception {
-
         String fileName = msg.getName();
         Path path = Paths.get(msg.getPath());
         clientDir = rootServer.resolve(path);
@@ -139,8 +157,56 @@ public class MessageHandler extends SimpleChannelInboundHandler<AbstractMessage>
         }
 
         if (msg.isFinishBatch()) {
+            ctx.writeAndFlush(new ListMessage(serverFilePath));
+        }
+
+        /**в теории это должен быть буфер, байты в который должны записываться быстрее чем в файл и это бы решило проблему битых файлов в конце, но файлы все равно бьються
+         * логика в том, что в переменную в памяти ону будут записываться куда быстрее чем файл, но как-то не получилось
+        if (msg.isFirstButch()) {
+            fileName = msg.getName();
+            posFrom = 0;
+            lastPos = 0;
+            Path path = Paths.get(msg.getPath());
+            clientDir = rootServer.resolve(path);
+
+            if (!Files.exists(clientDir)) {
+                Files.createDirectory(clientDir);
+            }
+            file = clientDir.resolve(fileName);
+            clientDir = rootServer;
+
+            Files.deleteIfExists(file);
+            cache = new byte[134217728];
+            System.arraycopy(msg.getBytes(), 0, cache, posFrom, msg.getEndByteNum());
+            k++;
+        } else {
+            log.info("posFrom {}", posFrom);
+            log.info("getEndByteNum {}", msg.getEndByteNum());
+            if (cache.length - posFrom < msg.getEndByteNum()){
+                try (FileOutputStream os = new FileOutputStream(file.toFile(), true)) {
+                    os.write(cache, 0, posFrom);
+                }
+                cache = new byte[134217728];
+                lastPos += posFrom;
+                posFrom = 0;
+                log.info("Written {} bytes", posFrom);
+            }
+            System.arraycopy(msg.getBytes(), 0, cache, posFrom, msg.getEndByteNum());
+            posFrom += msg.getEndByteNum();
+            k++;
+        }
+
+        if (msg.isFinishBatch()) {
+            try (FileOutputStream os = new FileOutputStream(file.toFile(), true)) {
+                log.info("lastPos {}", lastPos);
+                log.info("cache.length {}", cache.length);
+
+                os.write(cache, 0, msg.getEndByteNum());
+            }
             ctx.writeAndFlush(new ListMessage(rootServer));
         }
+        log.info("array copied {}", k);
+         */
     }
 
     private List<Path> directoryParsing(Path fp){

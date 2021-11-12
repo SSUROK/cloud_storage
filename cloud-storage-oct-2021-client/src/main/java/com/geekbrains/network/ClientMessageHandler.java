@@ -16,7 +16,7 @@ public class ClientMessageHandler extends SimpleChannelInboundHandler<AbstractMe
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, AbstractMessage msg) throws Exception {
-        log.debug("Received: {}", msg);
+//        log.debug("Received: {}", msg);
         callback.callback(msg);
     }
 }

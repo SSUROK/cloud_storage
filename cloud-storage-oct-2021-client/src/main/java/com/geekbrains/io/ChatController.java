@@ -5,14 +5,16 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 import com.geekbrains.model.*;
 import com.geekbrains.network.Net;
+import io.netty.channel.ChannelHandlerContext;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
@@ -20,7 +22,6 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.MouseButton;
-import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +32,6 @@ import static javafx.application.Platform.runLater;
 @Setter
 public class ChatController implements Initializable {
 
-    public AnchorPane anchorPane;
     public ListView<String> listLeft;
     public ListView<String> listRight;
     public TextField input;
@@ -40,21 +40,17 @@ public class ChatController implements Initializable {
     public Button reconnect;
     public ContextMenu contextMenuLeft;
     public ContextMenu contextMenuRight;
-    public ProgressBar progressBar;
     private Path rootClient;
     private Path rootServer;
     private Path clientFilePath;
     private Path serverFilePath;
-    private byte[] buffer;
     private Net net;
-    private Stage stage;
     private Parent parent;
     private UploadController uploadController;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
 
-        buffer = new byte[8192];
         rootClient = Paths.get("root-client");
         rootServer = Paths.get("root-server");
         clientFilePath = rootClient;
@@ -73,33 +69,21 @@ public class ChatController implements Initializable {
             e.printStackTrace();
         }
 
-        progressBar.setVisible(false);
-
         listRight.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2 && e.getButton() == MouseButton.PRIMARY) {
                 String fileName = listRight.getSelectionModel().getSelectedItem();
                 if (fileName.equals("Back to previous")){
                     if (serverFilePath.getParent() != null) {
                         serverFilePath = serverFilePath.getParent();
-                        try {
-                            net.send(new ListRequest(".."));
-                        } catch (Exception exception) {
-                            exception.printStackTrace();
-                        }
+                        net.send(new ListRequest(".."));
                     } else {
                         input.setText("no");
                     }
-                } else if (Files.isDirectory(serverFilePath.resolve(fileName))) {
+                } else if (!fileName.contains(".")) {
                     serverFilePath = Paths.get(serverFilePath.resolve(fileName).toString());
-                    try {
-                        net.send(new ListRequest(listRight.getSelectionModel().getSelectedItem()));
-                    } catch (Exception exception) {
-                        exception.printStackTrace();
-                    }
-                } else if (!Files.isDirectory(serverFilePath.resolve(fileName))){
-                    download.fire();
+                    net.send(new ListRequest(fileName));
                 } else {
-                    input.setText("Select file! Not directory");
+                    download.fire();
                 }
             }
         });
@@ -135,7 +119,6 @@ public class ChatController implements Initializable {
         });
 
         net = Net.getInstance(this::processMessage); // wait
-        log.info(String.valueOf(Thread.activeCount()));
     }
 
     public void reconnect(ActionEvent e){
@@ -151,23 +134,7 @@ public class ChatController implements Initializable {
         switch (message.getType()) {
 
             case FILE_MESSAGE:
-                FileMessage msg = (FileMessage) message;
-                clientFilePath = rootClient.resolve(msg.getPath());
-                if (!Files.exists(clientFilePath)) {
-                    Files.createDirectory(clientFilePath);
-                }
-                log.info("File path {}", clientFilePath);
-                Path file = clientFilePath.resolve(msg.getName());
-
-                if (msg.isFirstButch()) {
-                    Files.deleteIfExists(file);
-                }
-
-                try (FileOutputStream os = new FileOutputStream(file.toFile(), true)) {
-                    os.write(msg.getBytes(), 0, msg.getEndByteNum());
-                }
-
-                fillFilesInClient();
+                processFile((FileMessage) message);
                 break;
             case LIST_MESSAGE:
                 ListMessage list = (ListMessage) message;
@@ -192,6 +159,32 @@ public class ChatController implements Initializable {
         }
     }
 
+    private void processFile(FileMessage msg) throws Exception {
+        /**
+         * метод получения файла такой же как и у сервера, у сервера файлы приходят отлично, здесь контроллер на половине решает перестать получать сообщения
+         */
+        String fileName = msg.getName();
+        Path path = Paths.get(msg.getPath());
+        clientFilePath = rootClient.resolve(path);
+        if (!Files.exists(clientFilePath)) {
+            Files.createDirectory(clientFilePath);
+        }
+        Path file = clientFilePath.resolve(fileName);
+        clientFilePath = rootClient;
+
+        if (msg.isFirstButch()) {
+            Files.deleteIfExists(file);
+        }
+
+        try(FileOutputStream os = new FileOutputStream(file.toFile(), true)) {
+            os.write(msg.getBytes(), 0, msg.getEndByteNum());
+        }
+
+        if (msg.isFinishBatch()) {
+            fillFilesInClient();
+        }
+    }
+
     private void fillFilesInClient() {
         runLater(()->{
             listLeft.getItems().clear();
@@ -209,102 +202,26 @@ public class ChatController implements Initializable {
     }
 
     private void fillFilesInServer(){
-        try {
-            net.send(new ListRequest(serverFilePath.toString()));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        net.send(new ListRequest(serverFilePath.toString()));
     }
 
     /*отправка файла серверу*/
-    public void sendFile(ActionEvent actionEvent) throws IOException{
+    public void sendFile(ActionEvent actionEvent) throws Exception{
+        /**
+         * решил зпихнуть выкачивание файла в отдельный таск, чтоб было красиво и не вешалась программа во время отправки
+         * все было бы хорошо, если бы программа не выдавала критическую ошибку по кол-ву потоков иногда
+         * Internal Error (safepoint.cpp:712), pid=23059, tid=0x0000000000006107
+         * #  fatal error: Illegal threadstate encountered: 4
+         */
+        Stage stage = new Stage();
         String fileName = listLeft.getSelectionModel().getSelectedItem();
-        stage = new Stage();
         parent = FXMLLoader.load(getClass().getResource("upload-screen.fxml"));
         stage.setTitle("Upload");
         stage.setResizable(false);
         stage.setScene(new Scene(parent));
         stage.show();
         uploadController = new UploadController();
-        uploadController.sendFile(fileName, net, rootClient, clientFilePath);
-
-//        progressBar.progressProperty().unbind();
-//        runLater(()->progressBar.setVisible(true));
-//        ExecutorService executor = Executors.newFixedThreadPool(5);
-//        SendFile sf = SendFile.builder()
-//                .fileName(fileName)
-//                .net(net)
-//                .rootPath(rootClient)
-//                .path(clientFilePath)
-//                .progressBar(progressBar)
-//                .name(String.valueOf(Math.random()))
-//                .build();
-//        sf.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, //
-//                new EventHandler<WorkerStateEvent>() {
-//
-//                    @Override
-//                    public void handle(WorkerStateEvent t) {
-//                        fillFilesInServer();
-//                    }
-//                });
-//        executor.execute(new Thread(sf, fileName));
-//        progressBar.setProgress(0);
-//        runLater(()-> progressBar.setVisible(false));
-
-
-//        clientFilePath = Paths.get(clientFilePath.resolve(fileName).toString());
-//        runLater(()->progressBar.setVisible(true));
-//        List<Path> paths = new ArrayList<>();
-//        if (Files.isDirectory(clientFilePath)) {
-//            paths = directoryParsing(clientFilePath);
-//        } else {
-//            paths.add(clientFilePath);
-//        }
-//        paths.forEach(p -> {
-//            if (Files.exists(p)) {
-//                String path;
-//                if (!p.getParent().equals(rootClient)) {
-//                    path = p.getParent().toString();
-//                    path = path.replace(rootClient.toString() + "/", "");
-//                } else {
-//                    path = "";
-//                }
-//                boolean isFirstButch = true;
-//                long size = 0;
-//                try {
-//                    size = Files.size(p);
-//                    System.out.println("size " + size);
-//                } catch (IOException e) {
-//                    log.error("e:", e);
-//                }
-//                try (FileInputStream fis = new FileInputStream(p.toFile())) {
-//                    int read;
-//                    while ((read = fis.read(buffer)) != -1) {
-////                        log.info(fileName, path, size);
-//                        FileMessage message = FileMessage.builder()
-//                                .bytes(buffer)
-//                                .name(p.getFileName().toString())
-//                                .path(path)
-//                                .size(size)
-//                                .isFirstButch(isFirstButch)
-//                                .isFinishBatch(fis.available() <= 0)
-//                                .endByteNum(read)
-//                                .build();
-//                        net.send(message);
-//                        int r = read;
-////                        System.out.println(read);
-////                        runLater(()->{
-////                            progressBar.setProgress((double) r/buffer.length);
-////                        });
-//                        isFirstButch = false;
-//                    }
-//                } catch (Exception e) {
-//                    log.error("e:", e);
-//                }
-//            }
-//        });
-//        progressBar.setVisible(false);
-//        clientFilePath = clientFilePath.getParent();
+        uploadController.sendFile(fileName, net, rootClient, clientFilePath, stage);
     }
 
     public void requestFile(ActionEvent event){
@@ -312,21 +229,6 @@ public class ChatController implements Initializable {
         serverFilePath = serverFilePath.resolve(name);
         net.send(new FileRequest(serverFilePath.toString()));
         serverFilePath = serverFilePath.getParent();
-    }
-
-    /*представление директории в виде конченых файлов с путями*/
-    private List<Path> directoryParsing(Path fp){
-        List<Path> paths = new ArrayList<>();
-        File[] files = fp.toFile().listFiles();
-//        System.out.println(Arrays.toString(files));
-        for (File f : files){
-            if (f.isDirectory()){
-                paths.addAll(directoryParsing(f.toPath()));
-            } else {
-                paths.add(f.toPath());
-            }
-        }
-        return paths;
     }
 
     public void newFolderServer(ActionEvent event) {
@@ -343,7 +245,7 @@ public class ChatController implements Initializable {
     }
 
     public void deleteServer(ActionEvent event) {
-        net.send(new FileDelete(serverFilePath.resolve(listRight.getSelectionModel().getSelectedItem()).toString()));
+        net.send(new FileDelete((listRight.getSelectionModel().getSelectedItem())));
         fillFilesInServer();
     }
 
@@ -366,8 +268,20 @@ public class ChatController implements Initializable {
 
     public void deleteClient(ActionEvent event) {
         String name = listLeft.getSelectionModel().getSelectedItem();
+        deleteFile(clientFilePath.resolve(name));
+    }
+
+    private void deleteFile(Path path){
         try {
-            Files.delete(clientFilePath.resolve(name));
+            if(Files.isDirectory(path)) {
+                List<File> contains = Arrays.asList(path.toFile().listFiles());
+                if (!contains.isEmpty()) {
+                    contains.forEach(e -> {
+                        deleteFile(e.toPath());
+                    });
+                }
+            }
+            Files.delete(path);
         } catch (IOException e) {
             e.printStackTrace();
         }

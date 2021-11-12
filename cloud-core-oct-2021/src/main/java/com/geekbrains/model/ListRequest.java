@@ -14,7 +14,7 @@ public class ListRequest extends AbstractMessage {
 
     private final String dir;
 
-    public ListRequest(String dir) throws Exception {
+    public ListRequest(String dir) {
         setType(CommandType.LIST_REQUEST);
         this.dir = dir;
     }

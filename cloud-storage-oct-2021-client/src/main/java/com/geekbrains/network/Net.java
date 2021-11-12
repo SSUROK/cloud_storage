@@ -43,7 +43,7 @@ public class Net {
                                 );
                             }
                         });
-                ChannelFuture future = bootstrap.connect("192.168.1.15", 8189).sync();
+                ChannelFuture future = bootstrap.connect("localhost", 8189).sync();
                 log.debug("Network start listening");
                 callback.callback(ServerStatus.builder().status(CommandType.SERVER_ONLINE).build());
                 future.channel().closeFuture().sync();

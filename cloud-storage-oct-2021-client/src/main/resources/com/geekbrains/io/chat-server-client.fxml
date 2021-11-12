@@ -47,7 +47,7 @@
             </ContextMenu>
          </contextMenu></ListView>
       <TextField fx:id="input" layoutX="127.0" layoutY="462.0" prefHeight="27.0" prefWidth="210.0" />
-      <Label layoutX="14.0" layoutY="466.0" text="Msgs from server">
+      <Label fx:id="label" layoutX="14.0" layoutY="466.0" text="Msgs from server">
          <font>
             <Font name="Comic Sans MS" size="13.0" />
          </font></Label>
@@ -55,6 +55,5 @@
          <font>
             <Font name="Comic Sans MS" size="13.0" />
          </font></Button>
-      <ProgressBar fx:id="progressBar" layoutX="11.0" layoutY="431.0" prefHeight="20.0" prefWidth="324.0" progress="0.0" />
    </children>
 </AnchorPane>
