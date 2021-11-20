@@ -55,6 +55,7 @@ public class ChatController implements Initializable {
         rootServer = Paths.get("root-server");
         clientFilePath = rootClient;
         serverFilePath = rootServer;
+        net = Net.getInstance(this::processMessage);
         if (!Files.exists(rootClient)) {
             try {
                 Files.createDirectory(rootClient);
@@ -117,8 +118,6 @@ public class ChatController implements Initializable {
                 }
             }
         });
-
-        net = Net.getInstance(this::processMessage); // wait
     }
 
     public void reconnect(ActionEvent e){
@@ -207,20 +206,16 @@ public class ChatController implements Initializable {
 
     /*отправка файла серверу*/
     public void sendFile(ActionEvent actionEvent) throws Exception{
-        /**
-         * решил зпихнуть выкачивание файла в отдельный таск, чтоб было красиво и не вешалась программа во время отправки
-         * все было бы хорошо, если бы программа не выдавала критическую ошибку по кол-ву потоков иногда
-         * Internal Error (safepoint.cpp:712), pid=23059, tid=0x0000000000006107
-         * #  fatal error: Illegal threadstate encountered: 4
-         */
         Stage stage = new Stage();
         String fileName = listLeft.getSelectionModel().getSelectedItem();
-        parent = FXMLLoader.load(getClass().getResource("upload-screen.fxml"));
+        FXMLLoader loader = new FXMLLoader();
+        loader.setLocation(getClass().getResource("upload-screen.fxml"));
+        parent = loader.load();
         stage.setTitle("Upload");
         stage.setResizable(false);
         stage.setScene(new Scene(parent));
         stage.show();
-        uploadController = new UploadController();
+        uploadController = loader.getController();
         uploadController.sendFile(fileName, net, rootClient, clientFilePath, stage);
     }
 

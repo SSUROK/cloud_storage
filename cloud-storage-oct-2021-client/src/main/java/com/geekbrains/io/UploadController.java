@@ -38,9 +38,9 @@ import java.util.concurrent.TimeUnit;
 public class UploadController implements Initializable {
 
     public AnchorPane anchorPane;
-    public static ProgressBar myProgressBar;
+    public ProgressBar progressBar;
     public Button cancel;
-    public static Label activeFile;
+    public Label activeFile;
     public Button okButton;
 
     private static byte[] buffer;
@@ -54,23 +54,6 @@ public class UploadController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         buffer = new byte[65536];
-        /**
-         * далее идет добавление в окно полоски загрузки и строки состояния
-         * через scene builder их добавить не получилось, точнее не получается с ними после добавления взаимодействовать
-         * если просто ссылаться на них их функции sendfile то будет только NullPointerException, поэтому приходиться добавлять в ручную
-         * тоже самое с кнопками, прописанные в fxml-е onAction работают нормально, но взаимодействовать с ними из функций не реально
-         * что делать?
-         */
-        myProgressBar = new ProgressBar();
-        activeFile = new Label();
-        myProgressBar.setLayoutX(10);
-        myProgressBar.setLayoutY(10);
-        activeFile.setLayoutX(10);
-        activeFile.setLayoutY(50);
-        activeFile.setStyle("-fx-pref-width: 400; -fx-pref-height: 30; -fx-font-family: 'Comic Sans MS'");
-        myProgressBar.setStyle("-fx-pref-height: 30; -fx-pref-width: 400;");
-        anchorPane.getChildren().addAll(myProgressBar, activeFile);
-        myProgressBar.setProgress(0.0);
         okButton.setVisible(false);
     }
 
@@ -91,7 +74,7 @@ public class UploadController implements Initializable {
 
         rootPath = rootClient;
         path = clientFilePath;
-        myProgressBar.progressProperty().unbind();
+        progressBar.progressProperty().unbind();
         activeFile.textProperty().unbind();
         task = new Task() {
             @Override
@@ -139,12 +122,7 @@ public class UploadController implements Initializable {
                                 this.updateProgress(progress, size);
                                 net.send(message);
                                 isFirstButch = false;
-                                /**
-                                 * долго думал почему при отправки больших файлов(я ганял 5+гб) они приходят сильно урезанными
-                                 * оказалось сервак не успевает принять все сообщения и часть отбрасывает
-                                 * также помагает решить проблему с потоками указаную ранее
-                                 */
-                                TimeUnit.MILLISECONDS.sleep(1);
+                                TimeUnit.NANOSECONDS.sleep(1);
                             }
                             progress = 0;
                         } catch (Exception e) {
@@ -163,11 +141,12 @@ public class UploadController implements Initializable {
                     public void handle(WorkerStateEvent t) {
                         okButton.setVisible(true);
                         cancel.setVisible(false);
+                        activeFile.textProperty().unbind();
                         activeFile.setText("Completed");
                     }
                 });
 
-        myProgressBar.progressProperty().bind(task.progressProperty());
+        progressBar.progressProperty().bind(task.progressProperty());
         activeFile.textProperty().bind(task.messageProperty());
 
         new Thread(task, fileName).start();

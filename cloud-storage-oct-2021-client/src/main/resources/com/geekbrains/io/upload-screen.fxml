@@ -19,5 +19,7 @@
             <Font name="Comic Sans MS" size="13.0" />
          </font>
       </Button>
+      <ProgressBar fx:id="progressBar" layoutX="8.0" layoutY="14.0" prefHeight="29.0" prefWidth="405.0" progress="0.0" />
+      <Label fx:id="activeFile" layoutX="23.0" layoutY="52.0" prefHeight="17.0" prefWidth="365.0" text="Label" />
    </children>
 </AnchorPane>
